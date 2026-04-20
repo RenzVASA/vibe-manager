@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export / Import · DJ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:      #060610;
+            --surface: #0e0e1a;
+            --border:  #1a1a2e;
+            --green:   #00ff88;
+            --orange:  #ff9040;
+            --red:     #ff4466;
+            --blue:    #66aaff;
+            --muted:   #2a2a44;
+            --text:    #d0d0e8;
+            --subtext: #555570;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg); color: var(--text);
+            min-height: 100vh; padding: 40px 20px;
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,.008) 2px, rgba(0,255,136,.008) 4px);
+            pointer-events: none; z-index: 999;
+        }
+
+        .page { max-width: 700px; margin: 0 auto; }
+
+        .page-header { margin-bottom: 40px; }
+        .back-link {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 11px; color: var(--subtext); text-decoration: none;
+            letter-spacing: .08em; margin-bottom: 20px;
+            transition: color .15s;
+        }
+        .back-link:hover { color: var(--text); }
+        h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; }
+        h1 span { color: var(--green); }
+        .page-sub { font-size: 12px; color: var(--subtext); margin-top: 6px; }
+
+        /* Auth */
+        .auth-bar {
+            display: flex; gap: 10px; align-items: center;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px;
+            margin-bottom: 32px;
+        }
+        .auth-bar label { font-size: 11px; color: var(--subtext); letter-spacing: .08em; white-space: nowrap; }
+        .auth-bar input {
+            flex: 1; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 8px 12px; color: var(--text);
+            font-family: 'Space Mono'; font-size: 13px; outline: none;
+            transition: border-color .2s; letter-spacing: .1em;
+        }
+        .auth-bar input:focus { border-color: var(--green); }
+        .auth-status { font-size: 11px; white-space: nowrap; }
+        .auth-status.ok  { color: var(--green); }
+        .auth-status.err { color: var(--red); }
+
+        /* Cards */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 24px; margin-bottom: 20px;
+        }
+        .card-title {
+            font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+            margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+        }
+        .card-title .icon { font-size: 18px; }
+        .card-desc { font-size: 11px; color: var(--subtext); margin-bottom: 20px; line-height: 1.6; }
+
+        .btn {
+            font-family: 'Space Mono'; font-size: 11px; font-weight: 700;
+            letter-spacing: .08em; text-transform: uppercase;
+            padding: 10px 20px; border-radius: 7px; border: 1px solid transparent;
+            cursor: pointer; transition: all .15s;
+        }
+        .btn-green { background: rgba(0,255,136,.1); border-color: rgba(0,255,136,.3); color: var(--green); }
+        .btn-green:hover { background: rgba(0,255,136,.2); border-color: var(--green); }
+        .btn-blue  { background: rgba(102,170,255,.1); border-color: rgba(102,170,255,.3); color: var(--blue); }
+        .btn-blue:hover  { background: rgba(102,170,255,.2); border-color: var(--blue); }
+        .btn-orange { background: rgba(255,144,64,.1); border-color: rgba(255,144,64,.3); color: var(--orange); }
+        .btn-orange:hover { background: rgba(255,144,64,.2); border-color: var(--orange); }
+        .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* Export options */
+        .export-options { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        /* Import zone */
+        .drop-zone {
+            border: 2px dashed var(--border); border-radius: 10px;
+            padding: 32px; text-align: center; cursor: pointer;
+            transition: border-color .2s, background .2s; margin-bottom: 16px;
+        }
+        .drop-zone:hover, .drop-zone.drag { border-color: var(--blue); background: rgba(102,170,255,.04); }
+        .drop-zone.loaded { border-color: var(--green); background: rgba(0,255,136,.04); }
+        .drop-icon { font-size: 32px; margin-bottom: 10px; }
+        .drop-label { font-size: 12px; color: var(--subtext); }
+        .drop-label strong { color: var(--text); }
+        #file-input { display: none; }
+
+        /* Preview table */
+        #preview-area { display: none; }
+        .preview-info {
+            font-size: 11px; color: var(--subtext); margin-bottom: 12px;
+        }
+        .preview-info strong { color: var(--green); }
+        .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        thead { background: var(--bg); }
+        th { padding: 10px 14px; text-align: left; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--subtext); border-bottom: 1px solid var(--border); }
+        td { padding: 10px 14px; border-bottom: 1px solid rgba(26,26,46,.5); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,.02); }
+        .badge-ok  { font-size: 10px; color: var(--green);  background: rgba(0,255,136,.1);  border-radius: 4px; padding: 2px 7px; }
+        .badge-dup { font-size: 10px; color: var(--subtext); background: rgba(85,85,112,.15); border-radius: 4px; padding: 2px 7px; }
+
+        .import-actions { display: flex; gap: 10px; align-items: center; }
+        #import-result { font-size: 12px; color: var(--green); }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 24px; left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 100px; padding: 12px 24px;
+            font-size: 13px; z-index: 1000;
+            transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+            white-space: nowrap;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); }
+        #toast.ok  { border-color: var(--green); color: var(--green); }
+        #toast.err { border-color: var(--red);   color: var(--red); }
+        #toast.info { border-color: var(--blue); color: var(--blue); }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div class="page">
+    <div class="page-header">
+        <a href="/admin.html" class="back-link">← Retour au dashboard</a>
+        <h1>EXPORT <span>/</span> IMPORT</h1>
+        <p class="page-sub">Récapitulatif de soirée et gestion de liste de musiques</p>
+    </div>
+
+    <!-- Auth -->
+    <div class="auth-bar">
+        <label>MOT DE PASSE DJ</label>
+        <input type="password" id="password" placeholder="••••••••" oninput="checkAuth()">
+        <span class="auth-status" id="auth-status">—</span>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="card">
+        <div class="card-title"><span class="icon">↓</span> Exporter la soirée</div>
+        <p class="card-desc">
+            Génère un fichier avec toutes les musiques proposées ce soir : titre, artiste, nombre de votes, statut (joué / en attente / prochain) et passage.
+            Compatible Excel, Google Sheets, LibreOffice.
+        </p>
+        <div class="export-options">
+            <button class="btn btn-green" onclick="exportFile('csv')" id="btn-csv" disabled>↓ Télécharger CSV (Excel)</button>
+            <button class="btn btn-blue"  onclick="exportFile('json')" id="btn-json" disabled>↓ Télécharger JSON</button>
+        </div>
+    </div>
+
+    <!-- IMPORT -->
+    <div class="card">
+        <div class="card-title"><span class="icon">↑</span> Importer une liste</div>
+        <p class="card-desc">
+            Charge une liste de musiques à l'avance (CSV ou JSON). Les musiques déjà présentes dans la playlist seront ignorées.
+            <br>Format CSV attendu : <strong>titre;artiste</strong> (une ligne par morceau, sans en-tête obligatoire).
+        </p>
+
+        <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+             ondragover="ev(event,'drag')" ondragleave="ev(event,'')" ondrop="handleDrop(event)">
+            <div class="drop-icon">📂</div>
+            <div class="drop-label"><strong>Clique ou glisse un fichier ici</strong><br>CSV ou JSON acceptés</div>
+        </div>
+        <input type="file" id="file-input" accept=".csv,.json" onchange="handleFile(this.files[0])">
+
+        <div id="preview-area">
+            <div class="preview-info">
+                <strong id="preview-count">0</strong> morceaux détectés —
+                <span id="preview-dups">0</span> déjà dans la liste (ignorés)
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>#</th><th>Titre</th><th>Artiste</th><th>Statut</th></tr></thead>
+                    <tbody id="preview-body"></tbody>
+                </table>
+            </div>
+            <div class="import-actions">
+                <button class="btn btn-orange" onclick="doImport()" id="btn-import" disabled>↑ Importer dans la playlist</button>
+                <span id="import-result"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let password = '';
+    let parsedTracks = [];
+    let toastTimer;
+
+    function toast(msg, type = 'ok') {
+        const el = document.getElementById('toast');
+        el.textContent = msg; el.className = `show ${type}`;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.className = '', 3500);
+    }
+
+    async function checkAuth() {
+        password = document.getElementById('password').value;
+        const el = document.getElementById('auth-status');
+        if (!password) { el.textContent = '—'; el.className = 'auth-status'; setExportBtns(false); return; }
+        try {
+            const r = await fetch(`/api/export?password=${encodeURIComponent(password)}`);
+            if (r.ok) {
+                el.textContent = '✓ Accès autorisé'; el.className = 'auth-status ok';
+                setExportBtns(true);
+                if (parsedTracks.length) document.getElementById('btn-import').disabled = false;
+            } else {
+                el.textContent = '✕ Mot de passe incorrect'; el.className = 'auth-status err';
+                setExportBtns(false);
+            }
+        } catch { el.textContent = 'Erreur connexion'; el.className = 'auth-status err'; }
+    }
+
+    function setExportBtns(ok) {
+        document.getElementById('btn-csv').disabled  = !ok;
+        document.getElementById('btn-json').disabled = !ok;
+    }
+
+    async function exportFile(format) {
+        try {
+            const r = await fetch(`/api/export?password=${encodeURIComponent(password)}`);
+            if (!r.ok) return toast('Accès refusé', 'err');
+            const tracks = await r.json();
+            if (!tracks.length) return toast('Aucune donnée à exporter', 'err');
+
+            const date = new Date().toISOString().slice(0, 10);
+
+            if (format === 'json') {
+                const blob = new Blob([JSON.stringify(tracks, null, 2)], { type: 'application/json' });
+                dl(blob, `soiree-dj-${date}.json`);
+            } else {
+                const rows = [['Titre', 'Artiste', 'Votes', 'Statut', 'Passage']];
+                tracks.forEach(t => {
+                    const statut = t.status === 'played' ? 'Joué' : t.status === 'next' ? 'Prochain' : 'En attente';
+                    const passage = t.pass === 2 ? '2ème passage' : '1er passage';
+                    rows.push([
+                        `"${(t.title  || '').replace(/"/g,'""')}"`,
+                        `"${(t.artist || '').replace(/"/g,'""')}"`,
+                        t.votes, statut, passage
+                    ]);
+                });
+                const csv  = rows.map(r => r.join(';')).join('\n');
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                dl(blob, `soiree-dj-${date}.csv`);
+            }
+            toast('✓ Fichier téléchargé');
+        } catch { toast('Erreur export', 'err'); }
+    }
+
+    function dl(blob, name) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name; a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // ── Import ────────────────────────────────────────────────────────────────
+    function ev(e, cls) {
+        e.preventDefault();
+        document.getElementById('drop-zone').className = 'drop-zone ' + cls;
+    }
+
+    function handleDrop(e) {
+        e.preventDefault();
+        document.getElementById('drop-zone').className = 'drop-zone';
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+    }
+
+    function handleFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const text = e.target.result;
+                if (file.name.endsWith('.json')) {
+                    parsedTracks = JSON.parse(text);
+                    if (!Array.isArray(parsedTracks)) throw new Error();
+                    // Normaliser
+                    parsedTracks = parsedTracks.map(t => ({ title: t.title || '', artist: t.artist || 'Inconnu' }));
+                } else {
+                    // CSV : chaque ligne = titre;artiste  ou  titre,artiste
+                    parsedTracks = text.split('\n')
+                        .map(l => l.trim())
+                        .filter(l => l && !l.startsWith('#'))
+                        .map(l => {
+                            const sep = l.includes(';') ? ';' : ',';
+                            const parts = l.split(sep);
+                            return { title: (parts[0] || '').replace(/^"|"$/g,'').trim(), artist: (parts[1] || 'Inconnu').replace(/^"|"$/g,'').trim() };
+                        })
+                        .filter(t => t.title);
+                }
+                showPreview(file.name);
+            } catch {
+                toast('Fichier invalide', 'err');
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function showPreview(filename) {
+        const dz = document.getElementById('drop-zone');
+        dz.className = 'drop-zone loaded';
+        dz.querySelector('.drop-label').innerHTML = `<strong>${filename}</strong><br>${parsedTracks.length} lignes lues`;
+
+        document.getElementById('preview-count').textContent = parsedTracks.length;
+        document.getElementById('preview-dups').textContent  = '?';
+
+        const tbody = document.getElementById('preview-body');
+        tbody.innerHTML = parsedTracks.slice(0, 50).map((t, i) => `
+            <tr>
+                <td style="color:var(--subtext)">${i+1}</td>
+                <td>${esc(t.title)}</td>
+                <td style="color:var(--subtext)">${esc(t.artist)}</td>
+                <td><span class="badge-ok">À importer</span></td>
+            </tr>`).join('');
+        if (parsedTracks.length > 50) {
+            tbody.innerHTML += `<tr><td colspan="4" style="text-align:center;color:var(--subtext);font-size:11px;">… et ${parsedTracks.length - 50} autres</td></tr>`;
+        }
+
+        document.getElementById('preview-area').style.display = 'block';
+        const authed = document.getElementById('auth-status').classList.contains('ok');
+        document.getElementById('btn-import').disabled = !authed;
+    }
+
+    async function doImport() {
+        if (!parsedTracks.length || !password) return;
+        const btn = document.getElementById('btn-import');
+        btn.disabled = true; btn.textContent = 'Import en cours…';
+        try {
+            const r = await fetch('/api/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, tracks: parsedTracks })
+            });
+            const data = await r.json();
+            if (!r.ok) { toast(data.error || 'Erreur', 'err'); btn.disabled = false; btn.textContent = '↑ Importer dans la playlist'; return; }
+            document.getElementById('import-result').textContent = `✓ ${data.added} morceau(x) ajouté(s)`;
+            document.getElementById('preview-dups').textContent  = parsedTracks.length - data.added;
+            toast(`✓ ${data.added} morceau(x) importé(s)`, 'ok');
+            btn.textContent = '✓ Importé';
+        } catch { toast('Erreur import', 'err'); btn.disabled = false; btn.textContent = '↑ Importer dans la playlist'; }
+    }
+
+    function esc(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+</script>
+</body>
+</html>

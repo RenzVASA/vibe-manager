@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DJ Dashboard · Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="icon" type="image/ico" href="logo.ico">
+    <style>
+        :root {
+            --bg:      #060610;
+            --surface: #0e0e1a;
+            --border:  #1a1a2e;
+            --green:   #00ff88;
+            --orange:  #ff9040;
+            --yellow:  #ffe566;
+            --red:     #ff4466;
+            --blue:    #66aaff;
+            --muted:   #2a2a44;
+            --text:    #d0d0e8;
+            --subtext: #555570;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh; /* Fixe la hauteur pour le scroll */
+            overflow: hidden; /* Le scroll se fera dans les panels */
+        }
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,.012) 2px, rgba(0,255,136,.012) 4px);
+            pointer-events: none; z-index: 999;
+        }
+
+        /* Auth */
+        #auth-overlay {
+            position: fixed; inset: 0;
+            background: rgba(6,6,16,.97);
+            z-index: 500;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .auth-box {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 16px; padding: 40px 36px; width: 320px; text-align: center;
+        }
+        .auth-logo { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; margin-bottom: 6px; }
+        .auth-logo span { color: var(--green); }
+        .auth-sub { font-size: 11px; color: var(--subtext); letter-spacing: .08em; margin-bottom: 28px; }
+        .auth-input {
+            width: 100%; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 12px 16px; color: var(--text);
+            font-family: 'Space Mono'; font-size: 14px; outline: none;
+            transition: border-color .2s; margin-bottom: 12px; letter-spacing: .1em;
+        }
+        .auth-input:focus { border-color: var(--green); }
+        .auth-btn {
+            width: 100%; background: var(--green); color: #060610; border: none;
+            border-radius: 8px; padding: 12px; font-family: 'Space Mono';
+            font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+            cursor: pointer; transition: filter .15s, transform .1s;
+        }
+        .auth-btn:hover { filter: brightness(1.1); }
+        .auth-btn:active { transform: scale(.97); }
+        .auth-error { font-size: 11px; color: var(--red); margin-top: 10px; min-height: 16px; }
+
+        /* Header */
+        header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 15px 28px; border-bottom: 1px solid var(--border);
+            background: var(--surface); height: 60px;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .dj-badge {
+            background: var(--green); color: #060610;
+            font-family: 'Space Mono'; font-size: 10px; font-weight: 700;
+            letter-spacing: .1em; padding: 4px 10px; border-radius: 3px;
+        }
+        h1 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+        .live-indicator { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--subtext); }
+        .live-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--green); box-shadow: 0 0 8px var(--green);
+            animation: blink 1.4s step-end infinite;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+        /* Layout Fixe */
+        .layout { 
+            display: grid; 
+            grid-template-columns: 1fr 340px; 
+            height: calc(100vh - 60px); 
+        }
+        
+        .main-panel { 
+            padding: 24px 28px; 
+            overflow-y: auto; /* Seule la liste défile */
+            height: 100%;
+        }
+
+        .sidebar {
+            border-left: 1px solid var(--border); 
+            background: var(--surface);
+            padding: 24px 20px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px; 
+            overflow-y: auto; /* Au cas où les stats dépassent sur petit écran */
+            height: 100%;
+        }
+
+        /* Track row */
+        .track-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border: 1px solid var(--border);
+            border-radius: 8px; margin-bottom: 8px;
+            background: var(--surface);
+            transition: border-color .2s, background .2s;
+            animation: fadeIn .2s ease both;
+        }
+        @keyframes fadeIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+        .track-row:hover { border-color: var(--muted); background: #10101e; }
+
+        .track-row.is-next {
+            border-color: var(--blue) !important;
+            background: rgba(102,170,255,.08) !important;
+            box-shadow: 0 0 0 1px rgba(102,170,255,.2), inset 0 0 20px rgba(102,170,255,.06);
+        }
+
+        .track-row.pass-2 { border-left: 4px solid var(--orange); }
+
+        .next-label-inline {
+            font-size: 9px; letter-spacing: .12em; text-transform: uppercase;
+            color: var(--blue); background: rgba(102,170,255,.15);
+            border: 1px solid rgba(102,170,255,.3);
+            border-radius: 3px; padding: 2px 7px; flex-shrink: 0;
+        }
+
+        .track-row-rank { font-size: 11px; color: var(--subtext); width: 28px; flex-shrink: 0; }
+        .votes-badge {
+            background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.25);
+            border-radius: 6px; padding: 4px 10px; font-size: 13px; font-weight: 700;
+            color: var(--green); font-family: 'Space Mono'; min-width: 50px; text-align: center; flex-shrink: 0;
+        }
+        .track-name { flex: 1; min-width: 0; }
+        .track-title-dj { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 10px; }
+        .track-artist-dj { font-size: 11px; color: var(--subtext); margin-top: 2px; }
+        
+        .btn-copy {
+            background: var(--muted); color: var(--text); border: none;
+            font-family: 'Space Mono'; font-size: 9px; padding: 2px 6px;
+            border-radius: 4px; cursor: pointer; opacity: 0.6; transition: opacity 0.2s;
+        }
+        .btn-copy:hover { opacity: 1; background: var(--blue); color: #000; }
+
+        .actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn {
+            font-family: 'Space Mono'; font-size: 10px; font-weight: 700;
+            letter-spacing: .05em; padding: 6px 12px; border-radius: 5px;
+            border: 1px solid transparent; cursor: pointer; transition: all .15s; text-transform: uppercase;
+        }
+        .btn-next { background: rgba(102,170,255,.1); border-color: rgba(102,170,255,.3); color: var(--blue); }
+        .btn-play { background: rgba(0,255,136,.1); border-color: rgba(0,255,136,.3); color: var(--green); }
+        .btn-del { background: rgba(255,68,102,.08); border-color: rgba(255,68,102,.2); color: var(--red); }
+
+        /* Sidebar Elements */
+        .sidebar-title { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--subtext); margin-bottom: 14px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-box { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+        .stat-val { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--green); }
+        .stat-lbl { font-size: 9px; color: var(--subtext); letter-spacing: .06em; text-transform: uppercase; }
+
+        .auto-status {
+            font-size: 10px; padding: 8px; border-radius: 6px; text-align: center;
+            font-weight: bold; letter-spacing: 0.1em; margin-bottom: 10px;
+        }
+        .auto-on { background: rgba(0,255,136,0.1); color: var(--green); border: 1px solid var(--green); }
+        .auto-off { background: rgba(255,68,102,0.1); color: var(--red); border: 1px solid var(--red); }
+
+        .cooldown-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .cooldown-input {
+            width: 60px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 6px; padding: 6px; color: var(--text);
+            font-family: 'Space Mono'; font-size: 12px; text-align: center; outline: none;
+        }
+        .btn-apply-cd {
+            width: 100%; background: rgba(255,255,255,.03); border: 1px solid var(--border);
+            color: var(--text); font-family: 'Space Mono'; font-size: 10px;
+            letter-spacing: .08em; text-transform: uppercase; padding: 8px;
+            border-radius: 6px; cursor: pointer; transition: all .15s;
+        }
+        .btn-apply-cd:hover { background: var(--muted); border-color: var(--subtext); }
+
+        #played-list { max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; }
+        .played-item { font-size: 11px; margin-bottom: 6px; color: var(--subtext); display: flex; gap: 8px; }
+
+        /* Toasts */
+        #toast {
+            position: fixed; top: 80px; right: 20px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 6px; padding: 10px 18px; font-size: 12px;
+            z-index: 1000; opacity: 0; transform: translateX(20px);
+            transition: all .25s; font-family: 'Space Mono';
+        }
+        #toast.show { opacity: 1; transform: translateX(0); }
+        #toast.ok  { border-color: var(--green); color: var(--green); }
+        #toast.info { border-color: var(--blue); color: var(--blue); }
+        
+        .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .panel-title { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--subtext); }
+        .track-count { font-size: 11px; color: var(--green); }
+    </style>
+</head>
+<body>
+
+<div id="auth-overlay">
+    <div class="auth-box">
+        <div class="auth-logo">DJ <span>CENTER</span></div>
+        <div class="auth-sub">ACCÈS RÉSERVÉ AU DJ</div>
+        <input id="auth-input" class="auth-input" type="password" placeholder="Mot de passe…" onkeydown="if(event.key==='Enter') doAuth()">
+        <button class="auth-btn" onclick="doAuth()">ACCÉDER</button>
+        <div id="auth-error" class="auth-error"></div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<header>
+    <div class="header-left">
+        <span class="dj-badge">DJ</span>
+        <h1>COMMAND CENTER</h1>
+    </div>
+    <div class="live-indicator">
+        <span class="live-dot"></span>
+        <span>LIVE</span>
+    </div>
+</header>
+
+<div class="layout">
+    <div class="main-panel">
+        <div class="panel-header">
+            <span class="panel-title">File d'attente</span>
+            <span class="track-count" id="queue-count">—</span>
+        </div>
+        <div id="admin-list"></div>
+    </div>
+
+    <div class="sidebar">
+        <div>
+            <div class="sidebar-title">Database</div>
+          	  <button class="btn-apply-cd" 
+       			 style="border-color:var(--blue); color:var(--blue);" 
+       			 onclick="window.open('/export.html', '_blank')">
+   			 📦 EXPORT / IMPORT DATA
+		</button>
+        </div>
+
+        <div>
+            <div class="sidebar-title">Statistiques</div>
+            <div class="stats-grid">
+                <div class="stat-box"><div class="stat-val" id="s-pending">—</div><div class="stat-lbl">Attente</div></div>
+                <div class="stat-box"><div class="stat-val" id="s-votes">—</div><div class="stat-lbl">Votes</div></div>
+                <div class="stat-box"><div class="stat-val" id="s-played">—</div><div class="stat-lbl">Joués</div></div>
+                <div class="stat-box"><div class="stat-val" id="s-top">—</div><div class="stat-lbl">Top</div></div>
+            </div>
+        </div>
+
+        <div>
+            <div class="sidebar-title">⚙ Automation</div>
+            <div id="auto-indicator" class="auto-status auto-off">MODE AUTO : OFF</div>
+            <button class="btn-apply-cd" style="background: rgba(102,170,255,.1); border-color:var(--blue); color:var(--blue);" onclick="toggleAuto()">🔄 TOGGLE AUTO-NEXT</button>
+        </div>
+
+        <div>
+            <div class="sidebar-title">⏳ Cooldowns</div>
+            <div class="cooldown-row">
+                <div style="font-size:10px;">Proposer (min)</div>
+                <input id="cd-propose" class="cooldown-input" type="number" value="10">
+            </div>
+            <div class="cooldown-row">
+                <div style="font-size:10px;">Voter (min)</div>
+                <input id="cd-vote" class="cooldown-input" type="number" value="2">
+            </div>
+            <button class="btn-apply-cd" style="color:var(--green); border-color:var(--green);" onclick="applySettings()">▶ SAUVEGARDER</button>
+        </div>
+
+        <div>
+            <div class="sidebar-title">Derniers joués</div>
+            <div id="played-list"></div>
+        </div>
+
+        <div style="margin-top:auto; padding-top: 20px; display:flex; flex-direction:column; gap:8px;">
+            <button class="btn-apply-cd" style="border-color:var(--orange); color:var(--orange);" onclick="secondPass()">🌙 Activer 2ème Passage</button>
+            <button class="btn-apply-cd" style="border-color:var(--red); color:var(--red);" onclick="clearAll()">✕ Vider la Liste</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let toastTimer;
+    let playedCount = 0;
+    let currentAuto = false;
+
+    function toast(msg, type = 'ok') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = `show ${type}`;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.className = '', 3500);
+    }
+
+    function doAuth() {
+        const pw = document.getElementById('auth-input').value;
+        socket.emit('djAuth', { password: pw }, ({ ok }) => {
+            if (ok) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                toast('✓ Accès autorisé');
+            } else {
+                document.getElementById('auth-error').textContent = 'Mot de passe incorrect.';
+            }
+        });
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            toast('Copié dans le presse-papier !', 'info');
+        });
+    }
+
+    function toggleAuto() {
+        currentAuto = !currentAuto;
+        socket.emit('toggleAuto', currentAuto);
+    }
+
+    socket.on('settings', s => {
+        currentAuto = s.autoNext;
+        const ind = document.getElementById('auto-indicator');
+        ind.textContent = `MODE AUTO : ${currentAuto ? 'ON' : 'OFF'}`;
+        ind.className = `auto-status ${currentAuto ? 'auto-on' : 'auto-off'}`;
+        document.getElementById('cd-propose').value = s.cooldownPropose / 60000;
+        document.getElementById('cd-vote').value = s.cooldownVote / 60000;
+    });
+
+    socket.on('updateList', (tracks) => { render(tracks); updateStats(tracks); });
+    socket.on('playedList', (played) => { 
+        playedCount = played.length; 
+        renderPlayed(played); 
+        document.getElementById('s-played').textContent = playedCount;
+    });
+
+    function render(tracks) {
+        const el = document.getElementById('admin-list');
+        const nextTrack = tracks.find(t => t.status === 'next');
+        const pending = tracks.filter(t => t.status === 'pending');
+        document.getElementById('queue-count').textContent = tracks.length + ' sons';
+
+        if (!tracks.length) {
+            el.innerHTML = '<div class="empty-dj">File vide.</div>';
+            return;
+        }
+
+        const ordered = nextTrack ? [nextTrack, ...pending] : pending;
+        el.innerHTML = ordered.map((t, i) => {
+            const isNext = t.status === 'next';
+            const isP2 = t.pass === 2;
+            return `
+            <div class="track-row ${isNext ? 'is-next' : ''} ${isP2 ? 'pass-2' : ''}">
+                <span class="track-row-rank">${isNext ? '⏭' : '#' + (i + (nextTrack ? 0 : 1))}</span>
+                <span class="votes-badge" style="${isP2 ? 'border-color:var(--orange); color:var(--orange);' : ''}">${t.votes}${isP2 ? ' (P2)' : ''}</span>
+                <div class="track-name">
+                    <div class="track-title-dj">
+                        ${esc(t.title)}
+                        <button class="btn-copy" onclick="copyToClipboard('${esc(t.title)} - ${esc(t.artist)}')">COPY</button>
+                    </div>
+                    <div class="track-artist-dj">${esc(t.artist)}</div>
+                </div>
+                ${isNext ? '<span class="next-label-inline">NEXT</span>' : ''}
+                <div class="actions">
+                    ${!isNext ? `<button class="btn btn-next" onclick="setNext(${t.id})">NEXT</button>` : ''}
+                    <button class="btn btn-play" onclick="played(${t.id})">JOUÉ</button>
+                    <button class="btn btn-del" onclick="del(${t.id})">✕</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderPlayed(played) {
+        document.getElementById('played-list').innerHTML = played
+            .map(t => `<div class="played-item">✓ ${esc(t.title)}</div>`)
+            .join('');
+    }
+
+    function updateStats(tracks) {
+        document.getElementById('s-pending').textContent = tracks.length;
+        document.getElementById('s-votes').textContent = tracks.reduce((s, t) => s + t.votes, 0);
+        document.getElementById('s-top').textContent = tracks.length ? Math.max(...tracks.map(t => t.votes)) : 0;
+    }
+
+    function esc(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function setNext(id) { socket.emit('markAsNext', id); toast('⏭ Verrouillé'); }
+    function played(id) { socket.emit('markAsPlayed', id); toast('✓ Terminé'); }
+    function del(id) { if (confirm('Supprimer ?')) socket.emit('deleteTrack', id); }
+    function secondPass() { if(confirm('Remettre les joués en file ?')) socket.emit('secondPass'); }
+    function clearAll() { if (confirm('Tout vider ?')) socket.emit('clearAll'); }
+    function applySettings() {
+        socket.emit('updateSettings', {
+            cooldownPropose: +document.getElementById('cd-propose').value * 60000,
+            cooldownVote:    +document.getElementById('cd-vote').value    * 60000
+        });
+        toast('Paramètres enregistrés');
+    }
+</script>
+</body>
+</html>
