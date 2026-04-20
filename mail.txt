@@ -1,0 +1,25 @@
+Objet : [Proposition] Animation DJ interactive et Installation technique – Soirée des internes
+
+À l’attention de l'équipe de la MDL,
+
+Bonjour,
+
+Ayant déjà assuré avec succès l'installation technique et la sonorisation des deux dernières soirées des internes, nous, Klaus Vanoosthuyse et Thomas Savignac, souhaiterions vous proposer une approche innovante pour la prochaine édition.
+
+En tant que développeurs, nous avons créé une solution interactive unique pour résoudre le problème principal des soirées : le choix de la musique qui ne plaît pas toujours à tout le monde.
+
+Notre projet pour cette soirée repose sur trois piliers :
+
+La Démocratie Musicale : Nous avons développé une application web accessible via un simple QR Code. Chaque interne pourra proposer ses morceaux et voter en temps réel pour ses titres préférés. Résultat : la playlist s'adapte aux goûts de la majorité, éliminant ainsi toute frustration.
+
+Expertise Technique : Comme lors des précédentes soirées, nous prenons en charge l'intégralité de l'installation sonore et du câblage. Vous n'avez aucune logistique technique à gérer, nous maîtrisons déjà le matériel et les lieux.
+
+Contrôle et Modération : Notre interface "Command Center" nous permet de filtrer les propositions en direct pour garantir que l'ambiance reste festive et respectueuse du cadre lycéen.
+
+En nous confiant l'animation et la technique, vous profitez d'une solution "clé en main" portée par une équipe que vous connaissez déjà, tout en offrant une expérience interactive inédite aux élèves.
+
+Nous serions ravis de vous faire une démonstration de notre système (interface de vote et tableau de bord DJ) lors d'un bref entretien.
+
+Dans l'attente de votre retour, nous vous prions d'agréer l'expression de nos salutations distinguées.
+
+Klaus Vanoosthuyse & Thomas Savignac
