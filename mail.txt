@@ -4,7 +4,7 @@ Objet : [Proposition] Animation DJ interactive et Installation technique – Soi
 
 Bonjour,
 
-Ayant déjà assuré avec succès l'installation technique et la sonorisation des deux dernières soirées des internes, nous, Klaus Vanoosthuyse et Thomas Savignac, souhaiterions vous proposer une approche innovante pour la prochaine édition.
+Ayant déjà assuré avec succès l'installation technique et la sonorisation des deux dernières soirées des internes, nous, Kxxxxxx et Txxxxxxx, souhaiterions vous proposer une approche innovante pour la prochaine édition.
 
 En tant que développeurs, nous avons créé une solution interactive unique pour résoudre le problème principal des soirées : le choix de la musique qui ne plaît pas toujours à tout le monde.
 
@@ -22,4 +22,4 @@ Nous serions ravis de vous faire une démonstration de notre système (interface
 
 Dans l'attente de votre retour, nous vous prions d'agréer l'expression de nos salutations distinguées.
 
-Klaus Vanoosthuyse & Thomas Savignac
+Kxxxxx & Txxxxxxx
